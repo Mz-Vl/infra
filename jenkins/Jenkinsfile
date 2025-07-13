@@ -1,0 +1,60 @@
+pipeline {
+  agent {
+    kubernetes {
+      yaml """
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    some-label: jenkins-kaniko
+spec:
+  serviceAccountName: jenkins-sa
+  containers:
+    - name: kaniko
+      image: gcr.io/kaniko-project/executor:v1.16.0-debug
+      imagePullPolicy: Always
+      command:
+        - sleep
+      args:
+        - 99d
+"""
+    }
+  }
+
+  environment {
+    ECR_REGISTRY = "REPLACE_ME_ECR_URL"
+    IMAGE_NAME   = "django-app"
+    IMAGE_TAG    = "latest"
+  }
+
+  stages {
+    stage('Build & Push Docker Image') {
+      steps {
+        container('kaniko') {
+          sh '''
+            /kaniko/executor \
+              --context `pwd` \
+              --dockerfile `pwd`/jenkins/Dockerfile \
+              --destination=$ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG \
+              --cache=true \
+              --insecure \
+              --skip-tls-verify
+          '''
+        }
+      }
+    }
+
+    stage('Update Helm Chart') {
+      steps {
+        sh '''
+          sed -i "s|tag: .*|tag: $IMAGE_TAG|" helm/django-app/values.yaml
+          git config --global user.email "you@example.com"
+          git config --global user.name "Your Name"
+          git add helm/django-app/values.yaml
+          git commit -m "Update image tag to $IMAGE_TAG"
+          git push origin main
+        '''
+      }
+    }
+  }
+}
