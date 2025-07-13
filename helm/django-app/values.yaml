@@ -1,0 +1,22 @@
+replicaCount: 1
+
+image:
+  repository: <your-ecr-repo-url>
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8000
+
+resources: {}
+
+env:
+  DJANGO_SETTINGS_MODULE: myapp.settings
+  DEBUG: "True"
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 80
